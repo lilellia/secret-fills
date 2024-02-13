@@ -1,0 +1,26 @@
+[project]
+name = "secret-fills"
+version = "0.9.0"
+authors = [
+    { name = "Lily Ellington", email = "pixielf.0@gmail.com" },
+]
+description = ""
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta",
+]
+
+dependencies = [
+    "termcolor",
+    "colorama",
+    "loguru",
+    "yaspin",
+    "thefuzz"
+]
+
+[project.urls]
+Homepage = "https://github.com/lilellia/secret-fills"
