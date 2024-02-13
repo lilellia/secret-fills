@@ -37,11 +37,11 @@ Thus, example usages might be:
 
 ```bash
 # Search for a list of titles while ignoring any videos in the given playlist
-python3 secret-fills.py -f titles.txt --playlist-url https://www.youtube.com/playlist?list=PLAYLIST_ID -q
+python3 secret_fills.py -f titles.txt --playlist-url https://www.youtube.com/playlist?list=PLAYLIST_ID -q
 
 # The same search, but using an IDs file
-python3 secret-fills.py -f titles.txt --known-ids known_ids.pkl -q
+python3 secret_fills.py -f titles.txt --known-ids known_ids.pkl -q
 
 # Also include a search for the writer's username, but exclude their own videos as well
-python3 secret-fills.py -s lilellia -i lilellia -f titles.txt --known-ids known_ids.pkl -q
+python3 secret_fills.py -s lilellia -i lilellia -f titles.txt --known-ids known_ids.pkl -q
 ```

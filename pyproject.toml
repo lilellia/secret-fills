@@ -19,7 +19,8 @@ dependencies = [
     "colorama",
     "loguru",
     "yaspin",
-    "thefuzz"
+    "thefuzz",
+    "ttkbootstrap"
 ]
 
 [project.urls]

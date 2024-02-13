@@ -1,6 +1,6 @@
 import json
 import pickle
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from collections.abc import Container
 from contextlib import contextmanager
 from datetime import datetime
@@ -8,7 +8,7 @@ from pathlib import Path
 from queue import Queue
 from subprocess import Popen, PIPE
 from threading import Thread
-from typing import Any, TypeAlias, Iterator, NamedTuple, Literal
+from typing import Any, TypeAlias, Iterator, NamedTuple, Literal, Callable
 
 import colorama
 from termcolor import colored
@@ -113,7 +113,7 @@ def print_results(results: Queue, sp: Yaspin, quiet: bool = False):
             results.task_done()
 
 
-def main():
+def parse_argv() -> Namespace:
     parser = ArgumentParser()
     parser.add_argument("-n", "--number", type=int, default=10, help="the number of results to return (default: 10)")
     parser.add_argument("-s", "--search-terms", nargs="+", help="the strings to search")
@@ -128,8 +128,16 @@ def main():
     group.add_argument("--playlist-url", help="url of a playlist - ignore these videos")
     group.add_argument("--known-ids", type=Path, help="path to a file containing known ids - ignore these videos")
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+def main():
+    args = parse_argv()
+    run(args, consumer=print_results)
+    show_results(args.min_similarity)
+
+
+def run(args: Namespace, consumer: Callable[[Queue, Yaspin, bool], None]):
     # handle known IDs for filtering
     known_ids: set[str]
     if args.playlist_url:
@@ -160,7 +168,7 @@ def main():
         for worker in workers:
             worker.start()
 
-        consumer = Thread(target=print_results, args=(results, s), kwargs=dict(quiet=args.quiet), daemon=True)
+        consumer = Thread(target=consumer, args=(results, s), kwargs=dict(quiet=args.quiet), daemon=True)
         consumer.start()
 
         for worker in workers:
@@ -168,12 +176,14 @@ def main():
 
         results.join()
 
+
+def show_results(min_similarity: int):
     with open("results.txt", "r", encoding="utf-8") as f:
         data = [line.rstrip().split(" | ") for line in f.readlines()]
 
     data.sort(key=lambda line: int(line[1]))
     for line in data:
-        if int(line[1]) >= args.min_similarity:
+        if int(line[1]) >= min_similarity:
             print(" | ".join(line))
 
 
