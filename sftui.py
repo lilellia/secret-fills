@@ -1,4 +1,5 @@
 import re
+import sys
 import tkinter as tk
 from argparse import Namespace
 from pathlib import Path
@@ -123,21 +124,28 @@ class App(ttkb.Window):
         self.run_button.grid(row=5, column=0, columnspan=3, **grid_kw)
 
         # Results table
-        columns = ["Date", "Similarity", "Title", "Uploader", "URL"]
+        columns = [
+            dict(text="Similarity", stretch=False, width=100),
+            dict(text="Date", stretch=False, width=100),
+            dict(text="Title", stretch=True, minwidth=350),
+            dict(text="Uploader", stretch=False, width=200),
+            dict(text="URL", stretch=False, width=200)
+        ]
         self.results_table = Tableview(self, coldata=columns, paginated=True, searchable=True)
         self.results_table.grid(row=6, column=0, columnspan=3, **grid_kw)
 
     def consume_results(self, results: Queue, sp: Yaspin, quiet: bool = False):
         while True:
             result: secret_fills.SearchResult = results.get()
-            row = result.display.split(" | ")
-            row[2] = " | ".join(row[2:-2])
-            row[3] = row[-2]
-            row[4] = row[-1]
+            date, similarity, *title, uploader, url = result.display.split(" | ")
+            row = [int(similarity), date, " | ".join(title), uploader, url]
             self.results_table.insert_row("end", row)
             results.task_done()
 
     def run(self) -> None:
+        # clear results table
+        self.results_table.delete_rows()
+
         number = self.search_results_number_entry.value
 
         # handle search terms as comma-separated values
@@ -172,11 +180,23 @@ class App(ttkb.Window):
 
         sort_ascending = 0
         sort_descending = 1
-        self.results_table.sort_column_data(cid=1, sort=sort_descending)  # sort=1 => descending
+        self.results_table.sort_column_data(cid=0, sort=sort_descending)  # sort=1 => descending
         self.update()
 
 
+class CheckInstallApp(ttkb.Window):
+    def __init__(self):
+        super().__init__()
+
+        ttkb.Label(self, text="Error: Requirement yt-dlp is not installed.").grid(row=0, column=0, padx=10, pady=10,
+                                                                                  sticky="nsew")
+
+
 def main():
+    if not secret_fills.check_ytdlp_install():
+        CheckInstallApp().mainloop()
+        sys.exit(1)
+
     app = App("secret-fills", themename="darkly")
     app.mainloop()
 

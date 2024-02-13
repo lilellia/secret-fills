@@ -5,15 +5,23 @@ informed about.
 
 ## Installation
 
-This project requires Python 3. It was tested in Python 3.11, but any version >= 3.9 should work.
+**Prerequisites:**
+
+- Python>=3.9
+- yt-dlp
+
+The following packages are also required:
 
 ```bash
-python3 -m pip install termcolor colorama loguru yaspin thefuzz
+python3 -m pip install termcolor colorama loguru yaspin thefuzz ttkbootstrap
 ```
 
 ## Usage
 
-This is a terminal application. The following options are supported:
+`sftui.py` is a UI application. Simply run the file (via `python3 sftui.py`) and input the values into their respective
+field.
+
+`secret_fills.py` is a terminal application. The following options are supported:
 
 - `-n` / `--number NUMBER`: The number of search results to parse for each term. (Default: 10)
 - `-s` / `--search-terms SEARCH_TERMS...`: custom terms to be searched.

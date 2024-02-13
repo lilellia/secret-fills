@@ -1,5 +1,7 @@
 import json
 import pickle
+import subprocess
+import sys
 from argparse import ArgumentParser, Namespace
 from collections.abc import Container
 from contextlib import contextmanager
@@ -21,6 +23,15 @@ from yaspin.spinners import Spinners
 colorama.init()
 
 VideoData: TypeAlias = dict[str, Any]
+
+
+def check_ytdlp_install() -> bool:
+    """Determine whether yt-dlp is installed. Return True if installed and on PATH; False, otherwise."""
+    try:
+        subprocess.run(["yt-dlp", "--version"], capture_output=True)
+        return True
+    except FileNotFoundError:
+        return False
 
 
 class SearchResult(NamedTuple):
@@ -133,6 +144,10 @@ def parse_argv() -> Namespace:
 
 def main():
     args = parse_argv()
+
+    if not check_ytdlp_install():
+        sys.exit("Requirement: yt-dlp is not installed.")
+
     run(args, consumer=print_results)
     show_results(args.min_similarity)
 
@@ -151,9 +166,14 @@ def run(args: Namespace, consumer: Callable[[Queue, Yaspin, bool], None]):
         known_ids = set()
 
     # add titles to search strings as necessary
+    search_terms: list[str] = []
+
+    if args.search_terms:
+        search_terms.extend(args.search_terms)
+
     if args.file:
         titles = args.file.read_text().splitlines()
-        args.search_terms.extend(titles)
+        search_terms.extend(titles)
 
     # run in parallel
     results = Queue()
@@ -161,7 +181,7 @@ def run(args: Namespace, consumer: Callable[[Queue, Yaspin, bool], None]):
     kwargs = dict(number=args.number, ignore_uploaders=args.ignore_uploaders, ignore_ids=known_ids)
     workers = [
         Thread(target=do_search, args=(search_term, results), kwargs=kwargs, daemon=True)
-        for search_term in args.search_terms
+        for search_term in search_terms
     ]
 
     with spinner("Searching videos...") as s:
