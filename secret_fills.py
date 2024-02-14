@@ -175,10 +175,15 @@ def run(args: Namespace, consumer: Callable[[Queue, Yaspin, bool], None]):
         titles = args.file.read_text().splitlines()
         search_terms.extend(titles)
 
+    # handle ignored uploaders
+    ignored_channels: list[str] = []
+    if args.ignore_uploaders:
+        ignored_channels.extend(args.ignored_uploaders)
+
     # run in parallel
     results = Queue()
 
-    kwargs = dict(number=args.number, ignore_uploaders=args.ignore_uploaders, ignore_ids=known_ids)
+    kwargs = dict(number=args.number, ignore_uploaders=ignored_channels, ignore_ids=known_ids)
     workers = [
         Thread(target=do_search, args=(search_term, results), kwargs=kwargs, daemon=True)
         for search_term in search_terms
