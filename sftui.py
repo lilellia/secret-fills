@@ -9,7 +9,6 @@ from typing import Generic, TypeVar, Any, Callable, Iterable
 
 import ttkbootstrap as ttkb
 from ttkbootstrap.tableview import Tableview
-from yaspin.core import Yaspin
 
 import secret_fills
 
@@ -134,7 +133,7 @@ class App(ttkb.Window):
         self.results_table = Tableview(self, coldata=columns, paginated=True, searchable=True)
         self.results_table.grid(row=6, column=0, columnspan=3, **grid_kw)
 
-    def consume_results(self, results: Queue, sp: Yaspin, quiet: bool = False):
+    def consume_results(self, results: Queue[secret_fills.SearchResult], quiet: bool = False):
         while True:
             result: secret_fills.SearchResult = results.get()
             date, similarity, *title, uploader, url = result.display.split(" | ")
