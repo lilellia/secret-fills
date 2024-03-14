@@ -11,7 +11,8 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from queue import Queue, Empty
-from subprocess import PIPE, Popen
+from subprocess import CREATE_NO_WINDOW, PIPE, Popen
+from sys import platform
 from threading import Thread
 from typing import Any, Callable, Iterator, Literal, NamedTuple, TypeAlias, TypeVar
 
@@ -25,10 +26,12 @@ colorama.init()
 VideoData: TypeAlias = dict[str, Any]
 T = TypeVar("T")
 
+YT_DLP = ".\yt-dlp.exe" if platform == "win32" else "yt-dlp"
+
 def check_ytdlp_install() -> bool:
     """Determine whether yt-dlp is installed. Return True if installed and on PATH; False, otherwise."""
     try:
-        subprocess.run(["yt-dlp", "--version"], capture_output=True)
+        subprocess.run([YT_DLP, "--version"], capture_output=True)
         return True
     except FileNotFoundError:
         return False
@@ -42,8 +45,8 @@ class SearchResult(NamedTuple):
 
 
 def ytdlp_results(arg: str) -> Iterator[VideoData]:
-    cmd = ("yt-dlp", "-j", arg)
-    proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    cmd = (YT_DLP, "-j", arg)
+    proc = Popen(cmd, stdout=PIPE, stderr=PIPE, creationflags=CREATE_NO_WINDOW)
 
     assert proc.stdout is not None
     while line := proc.stdout.readline():
@@ -53,7 +56,7 @@ def ytdlp_results(arg: str) -> Iterator[VideoData]:
 def get_ids_from_playlist(playlist_url: str) -> set[str]:
     """Get a set of video IDs from the given playlist."""
     cmd = ("yt-dlp", "--flat-playlist", "--print", "id", playlist_url)
-    proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    proc = Popen(cmd, stdout=PIPE, stderr=PIPE, creationflags=CREATE_NO_WINDOW)
 
     assert proc.stdout is not None
     return set(line.decode().strip() for line in proc.stdout.readlines())
