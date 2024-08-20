@@ -1,4 +1,6 @@
+import sys
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -8,6 +10,8 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from loguru import logger
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.readonly"]
 
@@ -99,3 +103,16 @@ class YouTubeClient:
             token_file.write_text(creds.to_json(), encoding="utf-8")
 
         return creds
+
+
+@contextmanager
+def alert_if_exceeded_quota():
+    try:
+        yield
+    except HttpError as e:
+        if e.error_details[0]["reason"] == "quotaExceeded":
+            logger.error(f"Cannot complete action because YouTube API credit quota has been exceeded. Exiting.")
+            sys.exit(1)
+        else:
+            logger.error(f"Unknown error occurred: {e.reason}")
+            raise e

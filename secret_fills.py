@@ -11,7 +11,7 @@ from argvns import argvns, Arg
 from termcolor import colored
 from thefuzz import fuzz
 
-from yt import YouTubeClient, VideoData
+from yt import YouTubeClient, VideoData, alert_if_exceeded_quota
 
 # Windows compatibility
 colorama.init()
@@ -26,7 +26,8 @@ class SearchResult(NamedTuple):
 
 def get_ids_from_playlist(client: YouTubeClient, *, playlist_id: str) -> set[str]:
     """Get a set of video IDs from the given playlist."""
-    return set(video.id for video in client.videos_in_playlist(playlist_id))
+    with alert_if_exceeded_quota():
+        return set(video.id for video in client.videos_in_playlist(playlist_id))
 
 
 def format_search_result(video: VideoData, similarity: int) -> tuple[str, str]:
@@ -49,17 +50,18 @@ def format_search_result(video: VideoData, similarity: int) -> tuple[str, str]:
 def search(client: YouTubeClient, search_string: str, number: int, *, ignore_uploaders: Container[str],
            ignore_ids: Container[str], ignore_before: datetime | None) -> Iterator[SearchResult]:
     """Perform a search for the given string, and return the given number of results."""
-    for result in client.search(query=search_string, max_results=number, after=ignore_before):
-        if result.channel in ignore_uploaders:
-            continue
+    with alert_if_exceeded_quota():
+        for result in client.search(query=search_string, max_results=number, after=ignore_before):
+            if result.channel in ignore_uploaders:
+                continue
 
-        if result.id in ignore_ids:
-            continue
+            if result.id in ignore_ids:
+                continue
 
-        similarity = fuzz.partial_ratio(result.title, search_string)
-        colored_display, display = format_search_result(result, similarity)
+            similarity = fuzz.partial_ratio(result.title, search_string)
+            colored_display, display = format_search_result(result, similarity)
 
-        yield SearchResult(colored_display, display, search_term=search_string, similarity=similarity)
+            yield SearchResult(colored_display, display, search_term=search_string, similarity=similarity)
 
 
 def get_all_results(*query_date_pairs: tuple[str, datetime | None], max_results: int, playlist_id: str | None = None,
