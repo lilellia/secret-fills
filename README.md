@@ -8,48 +8,42 @@ informed about.
 **Prerequisites:**
 
 - Python>=3.9
-- yt-dlp
+- YouTube Data API v3 credentials, as `./credentials.json`.  
+  See [Step 1](https://developers.google.com/youtube/v3/quickstart/python#step_1_set_up_your_project_and_credentials) in
+  Google's quickstart guide.
 
 The following packages are also required:
 
 ```bash
-python3 -m pip install termcolor colorama loguru yaspin thefuzz ttkbootstrap
+python3 -m pip install termcolor colorama loguru thefuzz tabulate[widechars] google-api-python-client google-auth-httplib2 google-auth-oauthlib argvns
 ```
 
 ## Usage
 
-`sftui.py` is a UI application. Simply run the file (via `python3 sftui.py`) and input the values into their respective
-field.
-
 `secret_fills.py` is a terminal application. The following options are supported:
 
-- `-n` / `--number NUMBER`: The number of search results to parse for each term. (Default: 10)
+- `-n` / `--number NUMBER`: The number of search results to parse for each term. (Default: 25)
 - `-s` / `--search-terms SEARCH_TERMS...`: custom terms to be searched.
 
   Example: `python3 secret-fills.py -s girlfriend "summer picnic"`
-- `-f` / `--file FILE`: path to a file containing a list of search terms to use. It is recommended that this be a list
-  of script titles.
+- `-f` / `--file FILE`: path to a file containing a list of dates and search terms to use. It should be a .csv file
+  with "Date" and "Title" headers; dates should be in ISO format (YYYY-MM-DD). Any search results uploaded before these
+  dates will be ignored.
 - `-i` / `--ignore-uploaders CHANNEL_NAMES...`: a list of channel names to ignore in results.
-- `-q` / `--quiet`: Pass this flag to suppress output during the search.
 - `-m` / `--min-similarity VALUE`: In the final results, this is the threshold for a result to be shown. Should be a
   value
   between 0 and 100. (Default: 0)
 
-In addition, filtering out known video IDs can be done, using one of the two following arguments:
+In addition, filtering out known video IDs can be done, using the following argument:
 
-- `--playlist-url URL`: url to a playlist of known videos to exclude. These IDs are also cached to file, so that
-  subsequent runs can use `--known-ids`.
-- `--known-ids PATH`: path to a file (likely `known_ids.pkl`) containing the known IDs.
+- `--playlist-id PLAYLIST_ID`: id of a playlist of known videos to exclude.
 
 Thus, example usages might be:
 
 ```bash
 # Search for a list of titles while ignoring any videos in the given playlist
-python3 secret_fills.py -f titles.txt --playlist-url https://www.youtube.com/playlist?list=PLAYLIST_ID -q
-
-# The same search, but using an IDs file
-python3 secret_fills.py -f titles.txt --known-ids known_ids.pkl -q
+python3 secret_fills.py -f queries.csv --playlist-id $PLAYLIST_ID
 
 # Also include a search for the writer's username, but exclude their own videos as well
-python3 secret_fills.py -s lilellia -i lilellia -f titles.txt --known-ids known_ids.pkl -q
+python3 secret_fills.py -s lilellia -i lilellia -f queries.csv
 ```

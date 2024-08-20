@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import csv
+from bisect import bisect
 from collections.abc import Container
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Literal, NamedTuple
+from typing import Iterator, NamedTuple
 
 import colorama
 from argvns import argvns, Arg
+from tabulate import tabulate
 from termcolor import colored
 from thefuzz import fuzz
 
@@ -18,9 +20,8 @@ colorama.init()
 
 
 class SearchResult(NamedTuple):
-    colored_display: str
-    display: str
-    search_term: str
+    video: VideoData
+    query: str
     similarity: int
 
 
@@ -28,23 +29,6 @@ def get_ids_from_playlist(client: YouTubeClient, *, playlist_id: str) -> set[str
     """Get a set of video IDs from the given playlist."""
     with alert_if_exceeded_quota():
         return set(video.id for video in client.videos_in_playlist(playlist_id))
-
-
-def format_search_result(video: VideoData, similarity: int) -> tuple[str, str]:
-    sim_color: Literal["red", "yellow", "white"]
-    if similarity >= 80:
-        sim_color = "red"
-    elif similarity >= 50:
-        sim_color = "yellow"
-    else:
-        sim_color = "white"
-
-    similarity_str = colored(format(similarity, "03"), sim_color)
-    uploaded_str = video.uploaded.strftime("%d %b %Y")
-
-    colored_display = f"""{colored(uploaded_str, "white")} | {similarity_str} | {colored(video.title, "green")} | {colored(video.channel, "yellow")} | {video.url}"""
-    display = f"""{uploaded_str} | {similarity} | {video.title} | {video.channel} | {video.url}"""
-    return colored_display, display
 
 
 def search(client: YouTubeClient, search_string: str, number: int, *, ignore_uploaders: Container[str],
@@ -58,10 +42,12 @@ def search(client: YouTubeClient, search_string: str, number: int, *, ignore_upl
             if result.id in ignore_ids:
                 continue
 
-            similarity = fuzz.partial_ratio(result.title, search_string)
-            colored_display, display = format_search_result(result, similarity)
+            similarity = max(
+                fuzz.partial_ratio(result.title, search_string),
+                fuzz.partial_ratio(result.description, search_string),
+            )
 
-            yield SearchResult(colored_display, display, search_term=search_string, similarity=similarity)
+            yield SearchResult(video=result, query=search_string, similarity=similarity)
 
 
 def get_all_results(*query_date_pairs: tuple[str, datetime | None], max_results: int, playlist_id: str | None = None,
@@ -96,6 +82,8 @@ class Config:
     min_similarity: int = Arg(short="-m", long="--min-similarity", type=int, default=0,
                               help="the minimum similarity for a result to be printed")
     playlist_id: str | None = Arg(long="--playlist-id", help="the id of a playlist whose videos will be ignored")
+    table_format: str = Arg(long="--table-format", default="rounded-grid",
+                            help="the display style for the results table; see https://pypi.org/project/tabulate for options")
 
 
 def read_search_terms_file(filepath: Path) -> Iterator[tuple[str, datetime]]:
@@ -122,14 +110,37 @@ def main():
     results = get_all_results(*query_date_pairs, playlist_id=config.playlist_id, known_ids=None,
                               ignored_channels=set(config.ignored_channels), max_results=config.max_results)
 
-    show_results(results=results, min_similarity=config.min_similarity)
+    show_results(results=results, min_similarity=config.min_similarity, reverse_sort=True,
+                 table_format=config.table_format)
 
 
-def show_results(min_similarity: float, results: list[SearchResult] | None = None):
-    results = sorted(results, key=lambda r: r.similarity, reverse=False)
+def colour_similarity(similarity: int, thresholds: tuple[int, int] = (50, 80)) -> str:
+    i = bisect(thresholds, similarity)
+    colour = ["red", "yellow", "green"][i]
+
+    return colored(format(similarity, "03d"), colour)  # type: ignore
+
+
+def show_results(min_similarity: float, results: list[SearchResult], reverse_sort: bool, table_format: str):
+    results = sorted(results, key=lambda r: r.similarity, reverse=reverse_sort)
+
+    rows: list[list[str]] = []
+
     for result in results:
-        if result.similarity >= min_similarity:
-            print(result.colored_display)
+        if result.similarity < min_similarity:
+            continue
+
+        rows.append([
+            colour_similarity(result.similarity),
+            result.video.uploaded.strftime("%Y-%m-%d"),
+            result.video.title,
+            result.video.channel,
+            result.video.url
+        ])
+
+    headers = ["sim", "published", "title", "channel", "url"]
+    table = tabulate(rows, headers=headers, tablefmt=table_format)
+    print(table)
 
 
 if __name__ == "__main__":

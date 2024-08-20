@@ -19,6 +19,7 @@ SCOPES = ["https://www.googleapis.com/auth/youtube.readonly"]
 @dataclass
 class VideoData:
     title: str
+    description: str
     channel: str
     id: str
     uploaded: datetime
@@ -32,6 +33,7 @@ class VideoData:
     def from_json(cls, data: dict[str, Any]):
         title = data["snippet"]["title"]
         channel = data["snippet"]["channelTitle"]
+        description = data["snippet"]["description"]
         try:
             video_id = data["snippet"]["resourceId"]["videoId"]
         except KeyError:
@@ -39,7 +41,8 @@ class VideoData:
         uploaded = datetime.strptime(data["snippet"]["publishedAt"], "%Y-%m-%dT%H:%M:%S%z")
         thumbnail = data["snippet"]["thumbnails"].get("high", {}).get("high", None)
 
-        return cls(title=title, channel=channel, id=video_id, uploaded=uploaded, thumbnail=thumbnail)
+        return cls(title=title, description=description, channel=channel, id=video_id, uploaded=uploaded,
+                   thumbnail=thumbnail)
 
 
 class YouTubeClient:
