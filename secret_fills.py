@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import csv
-from argparse import ArgumentParser, Namespace
 from collections.abc import Container
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Literal, NamedTuple, Self
+from typing import Iterator, Literal, NamedTuple
 
 import colorama
+from argvns import argvns, Arg
 from termcolor import colored
 from thefuzz import fuzz
 
@@ -83,31 +82,18 @@ def get_all_results(*query_date_pairs: tuple[str, datetime | None], max_results:
     return results
 
 
-@dataclass
+@argvns
 class Config:
-    max_results: int
-    search_terms: list[str]
-    queries_filepath: Path
-    ignored_channels: list[str]
-    min_similarity: int
-    playlist_id: str | None
-
-    @classmethod
-    def from_argv(cls, args: list[str] | None = None, ns: Namespace | None = None) -> Self:
-        parser = ArgumentParser()
-        parser.add_argument("-n", "--max-results", type=int, default=10,
-                            help="the number of results to return (default: 10)")
-        parser.add_argument("-s", "--search-terms", nargs="+", help="the strings to search")
-        parser.add_argument("-f", "--queries-filepath", type=Path, help="path to file with search terms to search for")
-        parser.add_argument("-i", "--ignored-channels", nargs="+",
-                            help="channels to ignore uploads for (they will not appear in the results)")
-        parser.add_argument("-m", "--min-similarity", type=int, default=0,
-                            help="the minimum similarity for a result to be printed in final results")
-
-        parser.add_argument("--playlist-id", help="id of a playlist - ignore these videos")
-
-        cfg = parser.parse_args(args, ns)
-        return cls(**vars(cfg))
+    max_results: int = Arg(short="-n", long="--max-results", type=int, default=25,
+                           help="the number of results to return (default: 25)")
+    search_terms: list[str] = Arg(short="-s", long="--search-terms", nargs="+", help="additional strings to search")
+    queries_filepath: Path | None = Arg(short="-f", long="--queries-filepath", type=Path,
+                                        help="path to file with search terms and dates to search for")
+    ignored_channels: list[str] = Arg(short="-i", long="--ignored-channels", nargs="+",
+                                      help="channels to ignore uploads for")
+    min_similarity: int = Arg(short="-m", long="--min-similarity", type=int, default=0,
+                              help="the minimum similarity for a result to be printed")
+    playlist_id: str | None = Arg(long="--playlist-id", help="the id of a playlist whose videos will be ignored")
 
 
 def read_search_terms_file(filepath: Path) -> Iterator[tuple[str, datetime]]:
@@ -121,7 +107,7 @@ def read_search_terms_file(filepath: Path) -> Iterator[tuple[str, datetime]]:
 
 
 def main():
-    config = Config.from_argv()
+    config = Config()
 
     query_date_pairs: list[tuple[str, datetime | None]] = []
 
