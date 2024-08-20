@@ -113,7 +113,7 @@ class App(ttkb.Window):
 
         # --playlist-url / --known-ids
         ttkb.Label(self, text="Source of Video IDs to Ignore", justify="right").grid(row=4, column=0, **grid_kw)
-        self.known_ids_entry = CEntry(self, width=80, text="known_ids.pkl")
+        self.known_ids_entry = CEntry(self, width=80, text="")
         self.known_ids_entry.grid(row=4, column=1, **grid_kw)
         self.known_ids_source_type_selector = CDropdown(self, options=("File", "Playlist URL"))
         self.known_ids_source_type_selector.grid(row=4, column=2, **grid_kw)

@@ -6,7 +6,6 @@ from collections.abc import Container
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from queue import Queue
 from typing import Iterator, Literal, NamedTuple, Self
 
 import colorama
@@ -62,17 +61,6 @@ def search(client: YouTubeClient, search_string: str, number: int, *, ignore_upl
         colored_display, display = format_search_result(result, similarity)
 
         yield SearchResult(colored_display, display, search_term=search_string, similarity=similarity)
-
-
-def print_results(results: Queue[SearchResult], quiet: bool = False):
-    with open("results.txt", "w", encoding="utf-8") as f:
-        while True:
-            result: SearchResult = results.get()
-
-            if not quiet:
-                print(result.colored_display)
-            f.write(f"{result.display}\n")
-            results.task_done()
 
 
 def get_all_results(*query_date_pairs: tuple[str, datetime | None], max_results: int, playlist_id: str | None = None,
