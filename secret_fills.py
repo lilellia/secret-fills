@@ -91,7 +91,7 @@ class Config:
     search_terms: list[str] = Arg(short="-s", long="--search-terms", nargs="+", help="additional strings to search")
     queries_filepath: Path | None = Arg(short="-f", long="--queries-filepath", type=Path,
                                         help="path to file with search terms and dates to search for")
-    ignored_channels: list[str] = Arg(short="-i", long="--ignored-channels", nargs="+",
+    ignored_channels: list[str] = Arg(short="-i", long="--ignored-channels", nargs="+", default=[],
                                       help="channels to ignore uploads for")
     min_similarity: int = Arg(short="-m", long="--min-similarity", type=int, default=0,
                               help="the minimum similarity for a result to be printed")
