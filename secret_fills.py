@@ -61,13 +61,26 @@ def get_all_results(*query_date_pairs: tuple[str, datetime | None], max_results:
     if playlist_id:
         known_ids |= get_ids_from_playlist(client, playlist_id=playlist_id)
 
-    results: list[SearchResult] = []
-    for query, dt in query_date_pairs:
-        found = search(client, query, max_results, ignore_uploaders=ignored_channels, ignore_ids=known_ids,
-                       ignore_before=dt)
-        results.extend(found)
+    results: dict[str, SearchResult] = {}
 
-    return results
+    def _should_add(r: SearchResult) -> bool:
+        if r.video.id not in results:
+            # first time we've seen this video
+            return True
+
+        if r.similarity > results[r.video.id].similarity:
+            # we've found the video with a higher similarity score, so we'll replace it with that one
+            return True
+
+        return False
+
+    for query, dt in query_date_pairs:
+        for result in search(client, query, max_results, ignore_uploaders=ignored_channels, ignore_ids=known_ids,
+                             ignore_before=dt):
+            if _should_add(result):
+                results[result.video.id] = result
+
+    return list(results.values())
 
 
 @argvns
