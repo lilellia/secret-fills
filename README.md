@@ -15,7 +15,7 @@ informed about.
 The following packages are also required:
 
 ```bash
-python3 -m pip install termcolor colorama loguru thefuzz tabulate[widechars] google-api-python-client google-auth-httplib2 google-auth-oauthlib argvns
+python3 -m pip install termcolor colorama loguru thefuzz beaupy google-api-python-client google-auth-httplib2 google-auth-oauthlib argvns
 ```
 
 ## Usage
