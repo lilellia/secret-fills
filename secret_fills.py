@@ -3,14 +3,15 @@ from __future__ import annotations
 import csv
 from bisect import bisect
 from collections.abc import Container
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, NamedTuple
+from typing import Iterator
 
+import beaupy
 import colorama
 from argvns import argvns, Arg
-from tabulate import tabulate
-from termcolor import colored
+from loguru import logger
 from thefuzz import fuzz
 
 from yt import YouTubeClient, VideoData, alert_if_exceeded_quota
@@ -19,10 +20,28 @@ from yt import YouTubeClient, VideoData, alert_if_exceeded_quota
 colorama.init()
 
 
-class SearchResult(NamedTuple):
+def colour_similarity(similarity: int, thresholds: tuple[int, int] = (50, 80)) -> str:
+    i = bisect(thresholds, similarity)
+    colour = ["red", "yellow", "green"][i]
+
+    return f"[{colour}]{similarity:03d}[/{colour}]"
+
+
+@dataclass
+class SearchResult:
     video: VideoData
     query: str
     similarity: int
+
+    def __str__(self):
+        display_components = [
+            colour_similarity(self.similarity),
+            self.video.uploaded.strftime("%Y-%m-%d"),
+            self.video.url,
+            self.video.title,
+            self.video.channel,
+        ]
+        return " :: ".join(display_components)
 
 
 def get_ids_from_playlist(client: YouTubeClient, *, playlist_id: str) -> set[str]:
@@ -50,16 +69,18 @@ def search(client: YouTubeClient, search_string: str, number: int, *, ignore_upl
             yield SearchResult(video=result, query=search_string, similarity=similarity)
 
 
-def get_all_results(*query_date_pairs: tuple[str, datetime | None], max_results: int, playlist_id: str | None = None,
-                    known_ids: set[str] | None = None, ignored_channels: set[str] | None = None) -> list[SearchResult]:
+def get_all_results(
+        *query_date_pairs: tuple[str, datetime | None], max_results: int, playlist_id: str | None = None,
+        excluded_ids: set[str] | None = None, ignored_channels: set[str] | None = None
+) -> list[SearchResult]:
     client = YouTubeClient()
 
     # handle known IDs for filtering
-    if not known_ids:
-        known_ids = set()
+    if not excluded_ids:
+        excluded_ids = set()
 
     if playlist_id:
-        known_ids |= get_ids_from_playlist(client, playlist_id=playlist_id)
+        excluded_ids |= get_ids_from_playlist(client, playlist_id=playlist_id)
 
     results: dict[str, SearchResult] = {}
 
@@ -75,7 +96,7 @@ def get_all_results(*query_date_pairs: tuple[str, datetime | None], max_results:
         return False
 
     for query, dt in query_date_pairs:
-        for result in search(client, query, max_results, ignore_uploaders=ignored_channels, ignore_ids=known_ids,
+        for result in search(client, query, max_results, ignore_uploaders=ignored_channels, ignore_ids=excluded_ids,
                              ignore_before=dt):
             if _should_add(result):
                 results[result.video.id] = result
@@ -92,11 +113,11 @@ class Config:
                                         help="path to file with search terms and dates to search for")
     ignored_channels: list[str] = Arg(short="-i", long="--ignored-channels", nargs="+", default=[],
                                       help="channels to ignore uploads for")
+    exclude_ids: Path = Arg(short="-x", long="--exclude-ids", type=Path, default=Path("exclude_ids.txt"),
+                            help="a txt file containing video ids which should be ignored in the search results")
     min_similarity: int = Arg(short="-m", long="--min-similarity", type=int, default=0,
                               help="the minimum similarity for a result to be printed")
     playlist_id: str | None = Arg(long="--playlist-id", help="the id of a playlist whose videos will be ignored")
-    table_format: str = Arg(long="--table-format", default="rounded-grid",
-                            help="the display style for the results table; see https://pypi.org/project/tabulate for options")
 
 
 def read_search_terms_file(filepath: Path) -> Iterator[tuple[str, datetime]]:
@@ -120,40 +141,34 @@ def main():
     for query in config.search_terms:
         query_date_pairs.append((query, None))
 
-    results = get_all_results(*query_date_pairs, playlist_id=config.playlist_id, known_ids=None,
-                              ignored_channels=set(config.ignored_channels), max_results=config.max_results)
+    if config.exclude_ids.exists():
+        excluded_ids = set(line.strip() for line in config.exclude_ids.read_text(encoding="utf-8").splitlines())
+    else:
+        excluded_ids = set()
 
-    show_results(results=results, min_similarity=config.min_similarity, reverse_sort=True,
-                 table_format=config.table_format)
+    results = get_all_results(*query_date_pairs, playlist_id=config.playlist_id,
+                              excluded_ids=excluded_ids, ignored_channels=set(config.ignored_channels),
+                              max_results=config.max_results)
+
+    false_positive_ids = display_and_retrieve_false_positives(results=results, min_similarity=config.min_similarity)
+    if false_positive_ids:
+        logger.info(f"Appending {len(false_positive_ids)} to {config.exclude_ids.resolve()} as false positives.")
+        with open(config.exclude_ids, mode="a+", encoding="utf-8") as f:
+            f.writelines([f"{id_}\n" for id_ in false_positive_ids])
 
 
-def colour_similarity(similarity: int, thresholds: tuple[int, int] = (50, 80)) -> str:
-    i = bisect(thresholds, similarity)
-    colour = ["red", "yellow", "green"][i]
+def display_and_retrieve_false_positives(min_similarity: float, results: list[SearchResult]) -> list[str]:
+    """Display the search results and allow the user to select results which were false positives.
+    These ids can be filtered out on future runs."""
 
-    return colored(format(similarity, "03d"), colour)  # type: ignore
+    displayed_results = [r for r in results if r.similarity >= min_similarity]
+    displayed_results.sort(key=lambda r: r.similarity)
 
+    selected: list[SearchResult] = beaupy.select_multiple(displayed_results,  # type: ignore
+                                                          preprocessor=str,
+                                                          tick_character="[red]❌[/red]")
 
-def show_results(min_similarity: float, results: list[SearchResult], reverse_sort: bool, table_format: str):
-    results = sorted(results, key=lambda r: r.similarity, reverse=reverse_sort)
-
-    rows: list[list[str]] = []
-
-    for result in results:
-        if result.similarity < min_similarity:
-            continue
-
-        rows.append([
-            colour_similarity(result.similarity),
-            result.video.uploaded.strftime("%Y-%m-%d"),
-            result.video.title,
-            result.video.channel,
-            result.video.url
-        ])
-
-    headers = ["sim", "published", "title", "channel", "url"]
-    table = tabulate(rows, headers=headers, tablefmt=table_format)
-    print(table)
+    return [result.video.id for result in selected]
 
 
 if __name__ == "__main__":
